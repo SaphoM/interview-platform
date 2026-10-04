@@ -52,6 +52,9 @@ create policy submissions_select on public.submissions
 create policy submissions_insert on public.submissions
   for insert to anon with check (true);
 
+create policy submissions_delete on public.submissions
+  for delete to anon using (true);
+
 create policy submissions_update on public.submissions
   for update to anon using (true) with check (true);
 

@@ -61,13 +61,17 @@ export default function InterviewPage() {
   ).length;
   const pct = questions.length ? Math.round((answered / questions.length) * 100) : 0;
 
-  if (loading) return <main className="p-10 text-white">Loading…</main>;
+  if (loading)
+    return <main className="h-screen p-10 text-white">Loading…</main>;
 
   return (
-    <main className="max-w-3xl mx-auto p-6 pb-32">
-      <div className="mb-8">
+    <main className="h-screen flex flex-col max-w-3xl mx-auto">
+      {/* Header — fixed */}
+      <div className="pt-6 pb-5 shrink-0">
         <div className="flex items-baseline justify-between gap-4 mb-2">
-          <h1 className="text-2xl font-semibold text-white">Interview questions</h1>
+          <h1 className="text-2xl font-semibold text-white">
+            Interview questions
+          </h1>
           <span className="text-sm text-white/60 whitespace-nowrap">
             {answered} of {questions.length} answered
           </span>
@@ -80,26 +84,34 @@ export default function InterviewPage() {
         </div>
       </div>
 
-      {questions.map((q, i) => (
-        <section key={q.id} className="mb-10">
-          <div className="flex items-start justify-between gap-4 mb-2">
-            <p className="font-medium whitespace-pre-wrap text-white">
-              <span className="text-white/40 font-normal mr-2">Q{i + 1}</span>
-              {q.prompt}
-            </p>
-            <SaveBadge state={saveState[q.id] ?? 'idle'} />
-          </div>
-          <textarea
-            className="w-full bg-white/10 border border-white/30 rounded-lg p-3 min-h-40 font-mono text-sm text-white placeholder-white/40 focus:outline-none focus:border-white transition-colors"
-            value={responses[q.id] ?? ''}
-            onChange={(e) =>
-              setResponses((r) => ({ ...r, [q.id]: e.target.value }))
-            }
-            onBlur={() => saveAnswer(q.id, responses[q.id] ?? '')}
-          />
-        </section>
-      ))}
+      {/* Questions — scroll inside this container with an invisible scrollbar */}
+      <div className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="pb-32">
+          {questions.map((q, i) => (
+            <section key={q.id} className="mb-10">
+              <div className="flex items-start justify-between gap-4 mb-2">
+                <p className="font-medium whitespace-pre-wrap text-white">
+                  <span className="text-white/40 font-normal mr-2">
+                    Q{i + 1}
+                  </span>
+                  {q.prompt}
+                </p>
+                <SaveBadge state={saveState[q.id] ?? 'idle'} />
+              </div>
+              <textarea
+                className="w-full bg-white/10 border border-white/30 rounded-lg p-3 min-h-40 font-mono text-sm text-white placeholder-white/40 focus:outline-none focus:border-white transition-colors"
+                value={responses[q.id] ?? ''}
+                onChange={(e) =>
+                  setResponses((r) => ({ ...r, [q.id]: e.target.value }))
+                }
+                onBlur={() => saveAnswer(q.id, responses[q.id] ?? '')}
+              />
+            </section>
+          ))}
+        </div>
+      </div>
 
+      {/* Submit bar — fixed */}
       <div className="fixed bottom-0 left-0 right-0 bg-black/20 backdrop-blur-sm border-t border-white/20 p-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
           <span className="text-sm text-white/60">{pct}% complete</span>
