@@ -4,6 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import {
+  isAuthenticated,
+  login,
+  logout,
+  fetchLogins,
+  ADMIN_EMAIL,
+  type AdminLogin,
+} from '@/lib/admin';
 
 type Sub = {
   id: string;
@@ -14,7 +22,7 @@ type Sub = {
 
 type Question = { position: number; prompt: string };
 
-type Section = 'overview' | 'candidates' | 'questions' | 'settings';
+type Section = 'overview' | 'candidates' | 'questions' | 'sessions' | 'settings';
 
 type Settings = {
   duration: number;
@@ -27,14 +35,124 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'candidates', label: 'Candidates' },
   { id: 'questions', label: 'Questions' },
+  { id: 'sessions', label: 'Sessions' },
   { id: 'settings', label: 'Settings' },
 ];
 
-export default function Dashboard() {
+// ===== Auth gate =====
+export default function DashboardPage() {
+  const [authed, setAuthed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setAuthed(isAuthenticated());
+  }, []);
+
+  if (authed === null) {
+    return (
+      <main className="min-h-screen flex items-center justify-center text-white">
+        Loading…
+      </main>
+    );
+  }
+
+  if (!authed) {
+    return <AdminLogin onSuccess={() => setAuthed(true)} />;
+  }
+
+  return (
+    <AdminDashboard
+      onLogout={() => {
+        logout();
+        setAuthed(false);
+      }}
+    />
+  );
+}
+
+// ===== Login screen =====
+function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    const res = await login(email, password);
+    setSubmitting(false);
+    if (!res.ok) {
+      setError(res.error ?? 'Login failed.');
+      return;
+    }
+    onSuccess();
+  }
+
+  return (
+    <main className="min-h-screen flex items-center justify-center p-6">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-7 h-7 text-white"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+              />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-white">Admin sign in</h1>
+          <p className="text-white/60 text-sm mt-1">
+            Enter your credentials to access the dashboard
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            autoComplete="username"
+            autoFocus
+            className="w-full bg-white/10 border border-white/30 rounded-lg px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-white transition-colors"
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            autoComplete="current-password"
+            className="w-full bg-white/10 border border-white/30 rounded-lg px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-white transition-colors"
+          />
+          {error && <p className="text-red-200 text-sm">{error}</p>}
+          <button
+            type="submit"
+            disabled={submitting || !email || !password}
+            className="w-full bg-white text-gray-900 font-semibold px-6 py-3 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
+
+// ===== Dashboard (gated) =====
+function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const router = useRouter();
   const [active, setActive] = useState<Section>('overview');
   const [subs, setSubs] = useState<Sub[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [logins, setLogins] = useState<AdminLogin[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -56,6 +174,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchSubs();
     fetchQuestions();
+    fetchLogins().then(setLogins);
     const stored = localStorage.getItem(SETTINGS_KEY);
     if (stored) {
       try {
@@ -213,11 +332,30 @@ export default function Dashboard() {
         </nav>
         <div className="p-4 border-t border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600" />
-            <div>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shrink-0" />
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900">Admin</p>
-              <p className="text-xs text-gray-500">admin@company.com</p>
+              <p className="text-xs text-gray-500 truncate">{ADMIN_EMAIL}</p>
             </div>
+            <button
+              onClick={onLogout}
+              title="Sign out"
+              className="text-gray-400 hover:text-red-600 transition-colors shrink-0"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"
+                />
+              </svg>
+            </button>
           </div>
         </div>
       </aside>
@@ -405,6 +543,53 @@ export default function Dashboard() {
                   </li>
                 ))}
               </ul>
+            )}
+          </div>
+        </section>
+
+        {/* Sessions */}
+        <section id="sessions" className="reveal scroll-mt-6">
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold text-white">Sessions</h1>
+            <p className="text-sm text-white/60">
+              Devices and locations that have signed in
+            </p>
+          </div>
+
+          <div className="bg-white/95 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg">
+            {logins.length === 0 ? (
+              <p className="p-4 text-gray-500">No logins recorded yet.</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-sm text-gray-500">
+                    <th className="p-4">Device</th>
+                    <th className="p-4">Location</th>
+                    <th className="p-4">IP</th>
+                    <th className="p-4">Signed in</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logins.map((l) => (
+                    <tr key={l.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+                      <td className="p-4">
+                        <p className="font-medium text-gray-900">
+                          {l.browser ?? 'Unknown'} · {l.os ?? 'Unknown'}
+                        </p>
+                        <p className="text-xs text-gray-500">{l.device_type ?? '—'}</p>
+                      </td>
+                      <td className="p-4 text-sm text-gray-700">
+                        {[l.city, l.region, l.country].filter(Boolean).join(', ') ||
+                          'Unknown'}
+                      </td>
+                      <td className="p-4 text-sm text-gray-500">{l.ip ?? '—'}</td>
+                      <td className="p-4 text-sm text-gray-500">
+                        {new Date(l.created_at).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </section>
