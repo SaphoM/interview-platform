@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 
 // NOTE: These are intentionally hard-coded per requirements. They live in the
 // client bundle, so this is a light gate for the demo, NOT real security.
-export const ADMIN_EMAIL = 'sudio@xspark.co.za';
+export const ADMIN_EMAIL = 'studio@xspark.co.za';
 export const ADMIN_PASSWORD = '12345';
 
 const AUTH_KEY = 'admin_authenticated';
