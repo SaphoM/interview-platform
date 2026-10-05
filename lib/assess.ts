@@ -1,7 +1,8 @@
 // Rule-based assessment of a candidate's interview answers.
 // Computes an overall score, a recommendation, per-category breakdown,
-// and system-generated growth (development) areas. No external AI calls —
-// the heuristics reward answer substance and completeness per skill category.
+// and system-generated growth (development) areas. Scoring is based on the
+// answer CONTENT via rudimentary keyword/pattern signals (specificity,
+// examples, technical vocabulary, reasoning) — no external AI calls.
 
 export type QA = { position: number; response: string | null };
 
@@ -61,13 +62,57 @@ function categoryFor(position: number): CategoryKey {
   return (c?.key ?? 'behavioral') as CategoryKey;
 }
 
-// Rough substance heuristic based on answer length.
-function strength(text: string | null): number {
+// Rudimentary content analysis: scores what's actually IN the answer
+// (specificity, concrete examples, technical vocabulary, reasoning, structure)
+// rather than just its length. Intentionally simple keyword/pattern signals —
+// no external AI calls.
+
+// Answers that carry no real content.
+const NON_ANSWER =
+  /^\s*(i don'?t know|idk|not sure|no idea|dunno|n\/?a|na|skip|pass|no comment|nothing|none|no|yes|ok|okay|\.+|-+|\?+)[.!?\s]*$/i;
+
+// Signals that an answer is grounded in real, specific experience.
+const EXAMPLE_MARKERS =
+  /(for example|for instance|such as|e\.g\.|when i|in my (last|previous|current)|at my (last|previous)|one time|a time (when|i)|i (built|led|designed|implemented|created|worked on|was responsible for))/i;
+
+// Quantified / measurable detail.
+const METRIC =
+  /(\d+\s*%|\$\s?\d+|\b\d+(\.\d+)?\s*(years?|yrs?|months?|weeks?|days?|hours?|users?|customers?|clients?|projects?|people|engineers?|developers?|team members|members|requests?|transactions?|records?|rows?|tables?|servers?|services?|endpoints?|queries|million|thousand|k\b))/i;
+
+// Domain vocabulary.
+const TECH_TERMS =
+  /(api|rest|graphql|sql|nosql|database|query|index|react|component|state|hook|javascript|typescript|java|python|php|spring|django|node(?:\.js)?|express|server|endpoint|function|algorithm|framework|library|unit test|integration test|testing|deploy|ci\/cd|docker|kubernetes|cache|caching|redis|security|authentication|authorization|encryption|owasp|xss|csrf|injection|pipeline|etl|model|schema|normali[sz]ation|transaction|acid|scalab|performance|optimi[sz]|debug|profil|monitor|logging|microservice|architecture|design pattern|git|agile|scrum)/i;
+
+// Reasoning / structured thinking.
+const REASONING =
+  /(because|therefore|so that|in order to|as a result|which (meant|led|resulted|caused|allowed)|this (meant|led|resulted|allowed|helped)|consequently|trade-?off|pros and cons|the reason|my approach|i decided|we decided)/i;
+
+function answerQuality(text: string | null): number {
   const t = (text ?? '').trim();
-  if (t.length === 0) return 0;
-  if (t.length < 40) return 0.3;
-  if (t.length < 150) return 0.7;
-  return 1.0;
+  if (!t) return 0;
+  if (NON_ANSWER.test(t)) return 0;
+
+  const len = t.length;
+  let score: number;
+
+  // Base substance from length.
+  if (len < 15) return 0.1; // answered, but too thin to credit further
+  else if (len < 50) score = 0.2;
+  else if (len < 120) score = 0.35;
+  else if (len < 250) score = 0.45;
+  else score = 0.5;
+
+  // Content-quality signals (rudimentary).
+  if (EXAMPLE_MARKERS.test(t)) score += 0.15;
+  if (METRIC.test(t)) score += 0.15;
+  if (TECH_TERMS.test(t)) score += 0.1;
+  if (REASONING.test(t)) score += 0.1;
+
+  // Multi-sentence structure.
+  const sentences = t.split(/[.!?]+/).filter((s) => s.trim().length > 5).length;
+  if (sentences >= 2) score += 0.05;
+
+  return Math.min(1, score);
 }
 
 function recommendationFor(score: number): {
@@ -89,7 +134,7 @@ export function assess(qas: QA[]): Assessment {
 
   for (const qa of qas) {
     const key = categoryFor(qa.position);
-    const s = strength(qa.response);
+    const s = answerQuality(qa.response);
     const answered = (qa.response ?? '').trim().length > 0;
 
     sumAll += s;
