@@ -64,7 +64,7 @@ export default function SubmissionDetail() {
   if (!sub) return <main className="p-10 text-white">Not found.</main>;
 
   return (
-    <main className="max-w-3xl mx-auto p-6">
+    <main className="max-w-3xl mx-auto p-6 h-screen overflow-y-auto themed-scroll">
       <h1 className="text-2xl font-semibold mb-1 text-white">{sub.intern_name}</h1>
       <p className="text-sm text-white/60 mb-6">
         {new Date(sub.created_at).toLocaleString()}

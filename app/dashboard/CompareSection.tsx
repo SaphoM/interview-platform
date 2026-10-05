@@ -102,9 +102,10 @@ export default function CompareSection() {
         {candidates.length === 0 ? (
           <p className="p-4 text-gray-500">No candidates to compare yet.</p>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 text-left text-sm text-gray-500">
+          <div className="max-h-[60vh] overflow-y-auto themed-scroll">
+            <table className="w-full">
+              <thead className="sticky top-0 z-10 bg-white shadow-sm">
+                <tr className="border-b border-gray-100 text-left text-sm text-gray-500">
                 <th className="p-4 w-10">
                   <span className="sr-only">Compare</span>
                 </th>
@@ -176,6 +177,7 @@ export default function CompareSection() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
