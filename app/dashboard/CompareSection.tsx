@@ -26,16 +26,27 @@ export default function CompareSection() {
 
   useEffect(() => {
     (async () => {
-      const [{ data: qs }, { data: subs }, { data: answers }] = await Promise.all([
+      const [{ data: qs }, { data: subs }] = await Promise.all([
         supabase.from('questions').select('position').order('position'),
         supabase
           .from('submissions')
           .select('id, intern_name, completed_at')
           .order('created_at', { ascending: false }),
-        supabase
-          .from('answers')
-          .select('submission_id, response, questions(position)'),
       ]);
+
+      // Supabase caps a single query at 1000 rows, so paginate to fetch every
+      // answer (61+ candidates × 120 answers far exceeds one page).
+      const answers: any[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from('answers')
+          .select('submission_id, response, questions(position)')
+          .range(from, from + pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        answers.push(...data);
+        if (data.length < pageSize) break;
+      }
 
       const positions: number[] = ((qs as any[]) ?? []).map((q) => q.position);
       const bySub = new Map<string, Map<number, string | null>>();
