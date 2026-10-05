@@ -171,6 +171,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const revealedRef = useRef(false);
+  const mainRef = useRef<HTMLElement | null>(null);
 
   // Load data + persisted settings
   useEffect(() => {
@@ -197,7 +198,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           }
         });
       },
-      { rootMargin: '-25% 0px -60% 0px' }
+      { root: mainRef.current, rootMargin: '-25% 0px -60% 0px' }
     );
     SECTIONS.forEach(({ id }) => {
       const el = document.getElementById(id);
@@ -217,7 +218,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           }
         });
       },
-      { threshold: 0.08 }
+      { root: mainRef.current, threshold: 0.08 }
     );
     document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
     revealedRef.current = true;
@@ -305,7 +306,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   );
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       {/* Static background accents */}
       <div className="pointer-events-none fixed top-0 left-0 z-0">
         <div className="w-[28rem] h-[28rem] rounded-full bg-blue-400/20 blur-3xl" />
@@ -362,8 +363,11 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </aside>
 
-      {/* Main content — single continuous scroll */}
-      <main className="flex-1 ml-60 p-6 relative z-10 space-y-10">
+      {/* Main content — scrolls inside this container, not the whole page */}
+      <main
+        ref={mainRef}
+        className="flex-1 ml-60 p-6 relative z-10 space-y-10 overflow-y-auto themed-scroll"
+      >
         {/* Overview */}
         <section id="overview" className="reveal scroll-mt-6">
           <div className="mb-6">

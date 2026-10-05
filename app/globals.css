@@ -64,3 +64,23 @@ html {
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
 }
+
+/* Visible themed scrollbar for in-container scrolling */
+.themed-scroll {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(139, 63, 217, 0.45) rgba(255, 255, 255, 0.08); /* Firefox */
+}
+.themed-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.themed-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+.themed-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4f6df5, #8b3fd9);
+  border-radius: 8px;
+}
+.themed-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #6d4af5, #a05ae0);
+}
