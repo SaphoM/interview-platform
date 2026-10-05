@@ -12,6 +12,7 @@ import {
   ADMIN_EMAIL,
   type AdminLogin,
 } from '@/lib/admin';
+import { assess, type Assessment } from '@/lib/assess';
 import CompareSection from './CompareSection';
 
 type Sub = {
@@ -40,6 +41,13 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'sessions', label: 'Sessions' },
   { id: 'settings', label: 'Settings' },
 ];
+
+const TONE_STYLES: Record<Assessment['recommendationTone'], string> = {
+  strong: 'bg-green-100 text-green-700',
+  hire: 'bg-emerald-100 text-emerald-700',
+  maybe: 'bg-yellow-100 text-yellow-700',
+  no: 'bg-red-100 text-red-700',
+};
 
 // ===== Auth gate =====
 export default function DashboardPage() {
@@ -170,6 +178,13 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [pendingDelete, setPendingDelete] = useState<Sub | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [scores, setScores] = useState<
+    Record<
+      string,
+      { score: number; recommendation: string; tone: Assessment['recommendationTone'] }
+    >
+  >({});
+  const [sortBy, setSortBy] = useState<'score' | 'newest' | 'name'>('score');
   const revealedRef = useRef(false);
   const mainRef = useRef<HTMLElement | null>(null);
 
@@ -177,6 +192,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     fetchSubs();
     fetchQuestions();
+    fetchScores();
     fetchLogins().then(setLogins);
     const stored = localStorage.getItem(SETTINGS_KEY);
     if (stored) {
@@ -242,6 +258,53 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setQuestions((data as Question[]) ?? []);
   }
 
+  // Compute a content-based score per candidate for performance sorting.
+  async function fetchScores() {
+    const { data: qs } = await supabase
+      .from('questions')
+      .select('position')
+      .order('position');
+
+    // Supabase caps a query at 1000 rows — paginate to fetch every answer.
+    const answers: any[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from('answers')
+        .select('submission_id, response, questions(position)')
+        .range(from, from + pageSize - 1);
+      if (error || !data || data.length === 0) break;
+      answers.push(...data);
+      if (data.length < pageSize) break;
+    }
+
+    const positions: number[] = ((qs as any[]) ?? []).map((q) => q.position);
+    const bySub = new Map<string, Map<number, string | null>>();
+    (answers ?? []).forEach((a: any) => {
+      const sid = a.submission_id as string;
+      if (!bySub.has(sid)) bySub.set(sid, new Map());
+      bySub.get(sid)!.set(a.questions.position, a.response);
+    });
+
+    const map: Record<
+      string,
+      { score: number; recommendation: string; tone: Assessment['recommendationTone'] }
+    > = {};
+    bySub.forEach((ansMap, sid) => {
+      const qas = positions.map((p) => ({
+        position: p,
+        response: ansMap.get(p) ?? null,
+      }));
+      const a = assess(qas);
+      map[sid] = {
+        score: a.score,
+        recommendation: a.recommendation,
+        tone: a.recommendationTone,
+      };
+    });
+    setScores(map);
+  }
+
   async function createSubmission(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
@@ -297,9 +360,18 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const inProgress = total - completed;
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  const filtered = subs.filter((s) =>
-    s.intern_name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = subs
+    .filter((s) => s.intern_name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      if (sortBy === 'score') {
+        // Top performers first; candidates without a score sink to the bottom.
+        return (scores[b.id]?.score ?? -1) - (scores[a.id]?.score ?? -1);
+      }
+      if (sortBy === 'name') {
+        return a.intern_name.localeCompare(b.intern_name);
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   const filteredQuestions = questions.filter((q) =>
     q.prompt.toLowerCase().includes(qSearch.toLowerCase())
@@ -449,12 +521,23 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 {total} total · {completed} completed · {inProgress} in progress
               </p>
             </div>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search candidates..."
-              className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/50 focus:outline-none focus:border-white/40"
-            />
+            <div className="flex gap-2">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-white/40"
+              >
+                <option value="score">Top performers</option>
+                <option value="newest">Newest first</option>
+                <option value="name">Name A–Z</option>
+              </select>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search candidates..."
+                className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/50 focus:outline-none focus:border-white/40"
+              />
+            </div>
           </div>
 
           <div className="bg-white/95 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg">
@@ -471,6 +554,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     <th className="p-4">Name</th>
                     <th className="p-4">Date</th>
                     <th className="p-4">Status</th>
+                    <th className="p-4">Performance</th>
                     <th className="p-4">Actions</th>
                   </tr>
                 </thead>
@@ -491,6 +575,24 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         >
                           {s.completed_at ? 'Completed' : 'In Progress'}
                         </span>
+                      </td>
+                      <td className="p-4">
+                        {scores[s.id] ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-gray-900">
+                              {scores[s.id].score}/10
+                            </span>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                TONE_STYLES[scores[s.id].tone]
+                              }`}
+                            >
+                              {scores[s.id].recommendation}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="p-4">
                         <div className="flex gap-3">
