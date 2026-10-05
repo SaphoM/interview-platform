@@ -12,6 +12,7 @@ import {
   ADMIN_EMAIL,
   type AdminLogin,
 } from '@/lib/admin';
+import CompareSection from './CompareSection';
 
 type Sub = {
   id: string;
@@ -22,7 +23,7 @@ type Sub = {
 
 type Question = { position: number; prompt: string };
 
-type Section = 'overview' | 'candidates' | 'questions' | 'sessions' | 'settings';
+type Section = 'overview' | 'candidates' | 'questions' | 'compare' | 'sessions' | 'settings';
 
 type Settings = {
   duration: number;
@@ -35,6 +36,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'candidates', label: 'Candidates' },
   { id: 'questions', label: 'Questions' },
+  { id: 'compare', label: 'Compare' },
   { id: 'sessions', label: 'Sessions' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -545,6 +547,17 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </ul>
             )}
           </div>
+        </section>
+
+        {/* Compare */}
+        <section id="compare" className="reveal scroll-mt-6">
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold text-white">Compare</h1>
+            <p className="text-sm text-white/60">
+              Assess outcomes and compare candidates side by side
+            </p>
+          </div>
+          <CompareSection />
         </section>
 
         {/* Sessions */}
