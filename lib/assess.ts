@@ -57,7 +57,7 @@ const GROWTH_SUGGESTIONS: Record<CategoryKey, string> = {
     'Architecture & system design — practice designing APIs, transactions, and scalable systems.',
 };
 
-function categoryFor(position: number): CategoryKey {
+export function categoryForPosition(position: number): CategoryKey {
   const c = CATEGORIES.find((c) => position >= c.from && position <= c.to);
   return (c?.key ?? 'behavioral') as CategoryKey;
 }
@@ -133,7 +133,7 @@ export function assess(qas: QA[]): Assessment {
   let answeredAll = 0;
 
   for (const qa of qas) {
-    const key = categoryFor(qa.position);
+    const key = categoryForPosition(qa.position);
     const s = answerQuality(qa.response);
     const answered = (qa.response ?? '').trim().length > 0;
 

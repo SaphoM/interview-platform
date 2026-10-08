@@ -14,6 +14,7 @@ import {
 } from '@/lib/admin';
 import { assess, type Assessment } from '@/lib/assess';
 import CompareSection from './CompareSection';
+import InPersonSection from './InPersonSection';
 
 type Sub = {
   id: string;
@@ -24,7 +25,7 @@ type Sub = {
 
 type Question = { position: number; prompt: string };
 
-type Section = 'overview' | 'candidates' | 'questions' | 'compare' | 'sessions' | 'settings';
+type Section = 'overview' | 'candidates' | 'inperson' | 'questions' | 'compare' | 'sessions' | 'settings';
 
 type Settings = {
   duration: number;
@@ -36,6 +37,7 @@ const SETTINGS_KEY = 'interview-settings';
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'candidates', label: 'Candidates' },
+  { id: 'inperson', label: 'In-Person' },
   { id: 'questions', label: 'Questions' },
   { id: 'compare', label: 'Compare' },
   { id: 'sessions', label: 'Sessions' },
@@ -185,6 +187,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     >
   >({});
   const [sortBy, setSortBy] = useState<'score' | 'newest' | 'name'>('score');
+  const [inPersonId, setInPersonId] = useState<string | null>(null);
   const revealedRef = useRef(false);
   const mainRef = useRef<HTMLElement | null>(null);
 
@@ -603,6 +606,15 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                             View
                           </Link>
                           <button
+                            onClick={() => {
+                              setInPersonId(s.id);
+                              scrollTo('inperson');
+                            }}
+                            className="text-sm text-purple-600 hover:underline"
+                          >
+                            In-person
+                          </button>
+                          <button
                             onClick={() => setPendingDelete(s)}
                             className="text-sm text-red-600 hover:underline"
                           >
@@ -616,6 +628,17 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </table>
             )}
           </div>
+        </section>
+
+        {/* In-Person Interview */}
+        <section id="inperson" className="reveal scroll-mt-6">
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold text-white">In-Person Interview</h1>
+            <p className="text-sm text-white/60">
+              6 tailored follow-up questions per candidate for the face-to-face round
+            </p>
+          </div>
+          <InPersonSection selectedId={inPersonId} onSelect={setInPersonId} />
         </section>
 
         {/* Questions */}
